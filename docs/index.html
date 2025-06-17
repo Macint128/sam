@@ -10,65 +10,127 @@
   <link rel="apple-touch-icon" href="icon.png" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; }
-    body, html { height: 100%; background: #000; color: white; text-align: center; }
+    html, body { height: 100%; background: #000; color: white; text-align: center; overflow: hidden; }
     #camera-container { position: relative; width: 100%; height: 100vh; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    #capture-button {
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* 미러 제거 (전면카메라 시 보정) */
+      filter: brightness(1) contrast(1);
+    }
+    #controls {
       position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    button {
       background: rgba(255,255,255,0.8);
       border: none;
-      border-radius: 50%;
-      width: 70px;
-      height: 70px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      border-radius: 10px;
+      padding: 10px 15px;
+      font-weight: bold;
       cursor: pointer;
     }
     #snapshot {
-      display: none;
       position: absolute;
       top: 10px;
       right: 10px;
       max-width: 30%;
       border: 2px solid white;
+      display: none;
+    }
+    #filter-slider {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 120px;
     }
   </style>
 </head>
 <body>
   <div id="camera-container">
     <video id="video" autoplay playsinline></video>
-    <button id="capture-button"></button>
     <canvas id="canvas" style="display: none;"></canvas>
-    <img id="snapshot" alt="촬영된 이미지 미리보기" />
+    <img id="snapshot" />
+    <input type="range" id="filter-slider" min="0.5" max="1.5" step="0.05" value="1" title="밝기조절" />
+    <div id="controls">
+      <button id="capture-btn">📷 사진</button>
+      <button id="record-btn">🔴 녹화</button>
+    </div>
   </div>
 
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const snapshot = document.getElementById('snapshot');
-    const captureButton = document.getElementById('capture-button');
+    const captureBtn = document.getElementById('capture-btn');
+    const recordBtn = document.getElementById('record-btn');
+    const filterSlider = document.getElementById('filter-slider');
 
-    // 카메라 접근
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    // 카메라 시작
     async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
         video.srcObject = stream;
+
+        // 미디어 레코더 준비
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: "video/webm" });
+          recordedChunks = [];
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'recording.webm';
+          a.click();
+          URL.revokeObjectURL(url);
+        };
       } catch (err) {
-        alert("카메라에 접근할 수 없습니다 😢\n" + err.message);
+        alert("카메라 또는 마이크 접근 실패 🥲\n" + err.message);
       }
     }
 
-    // 사진 촬영
-    captureButton.addEventListener('click', () => {
-      const context = canvas.getContext('2d');
+    // 사진 찍기
+    captureBtn.addEventListener('click', () => {
+      const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageDataUrl = canvas.toDataURL('image/png');
-      snapshot.src = imageDataUrl;
+      ctx.translate(canvas.width, 0); // 미러 제거
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgUrl = canvas.toDataURL('image/png');
+      snapshot.src = imgUrl;
       snapshot.style.display = 'block';
+    });
+
+    // 녹화 시작/중지
+    recordBtn.addEventListener('click', () => {
+      if (!isRecording) {
+        mediaRecorder.start();
+        recordBtn.textContent = "⏹️ 정지";
+        isRecording = true;
+      } else {
+        mediaRecorder.stop();
+        recordBtn.textContent = "🔴 녹화";
+        isRecording = false;
+      }
+    });
+
+    // 필터(밝기/톤) 조절
+    filterSlider.addEventListener('input', () => {
+      const val = filterSlider.value;
+      video.style.filter = `brightness(${val}) contrast(${val})`;
     });
 
     startCamera();
