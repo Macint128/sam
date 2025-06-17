@@ -44,13 +44,16 @@
       font-weight: bold;
       padding-top: 10px;
     }
-    .input-area {
-      margin-bottom: 10px;
+    .input-area, .logo-upload, .print-btn {
+      margin-bottom: 15px;
     }
-    input {
+    input[type="text"], input[type="number"] {
       width: 30%;
       padding: 6px;
       margin-right: 5px;
+      font-family: inherit;
+    }
+    input[type="file"] {
       font-family: inherit;
     }
     button {
@@ -62,7 +65,6 @@
     .print-btn {
       display: block;
       width: 100%;
-      margin-top: 15px;
       padding: 10px;
       background: black;
       color: white;
@@ -70,10 +72,33 @@
       border: none;
       border-radius: 5px;
     }
+    #logo-preview {
+      max-width: 200px;
+      display: block;
+      margin: 10px auto;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .input-area, .print-btn, .logo-upload {
+        display: none;
+      }
+      table {
+        font-size: 12pt;
+      }
+    }
   </style>
 </head>
 <body>
   <h1>Receipt Rocket 🚀</h1>
+  <div class="logo-upload">
+    <input type="file" id="logoInput" accept="image/*" />
+  </div>
+  <img id="logo-preview" src="" alt="로고 미리보기" style="display:none;" />
+
   <div class="date" id="date"></div>
 
   <div class="input-area">
@@ -92,8 +117,7 @@
         <th>합계</th>
       </tr>
     </thead>
-    <tbody id="list">
-    </tbody>
+    <tbody id="list"></tbody>
   </table>
 
   <div class="total" id="total">총합계: 0원</div>
@@ -103,6 +127,8 @@
   <script>
     const list = document.getElementById('list');
     const total = document.getElementById('total');
+    const logoInput = document.getElementById('logoInput');
+    const logoPreview = document.getElementById('logo-preview');
 
     function updateDate() {
       const now = new Date();
@@ -148,6 +174,18 @@
       });
       total.innerText = `총합계: ${sum.toLocaleString()}원`;
     }
+
+    logoInput.addEventListener('change', function () {
+      const file = logoInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          logoPreview.src = e.target.result;
+          logoPreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     updateDate();
   </script>
